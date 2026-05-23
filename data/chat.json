@@ -1,0 +1,62 @@
+[
+    {
+        "id": 1,
+        "sender": "them",
+        "text": "hey",
+        "delay": 0
+    },
+    {
+        "id": 2,
+        "sender": "me",
+        "text": "hey, what's up?",
+        "delay": 1200
+    },
+    {
+        "id": 3,
+        "sender": "them",
+        "text": "nothing just bored lol",
+        "delay": 2600
+    },
+    {
+        "id": 4,
+        "sender": "me",
+        "text": "same honestly",
+        "delay": 3800
+    },
+    {
+        "id": 5,
+        "sender": "them",
+        "text": "do you ever just think about random stuff at night",
+        "delay": 5400
+    },
+    {
+        "id": 6,
+        "sender": "me",
+        "text": "all the time",
+        "delay": 7000
+    },
+    {
+        "id": 7,
+        "sender": "them",
+        "text": "like what",
+        "delay": 8200
+    },
+    {
+        "id": 8,
+        "sender": "me",
+        "text": "like whether the things that feel small now will end up mattering later",
+        "delay": 10000
+    },
+    {
+        "id": 9,
+        "sender": "them",
+        "text": "that's actually kind of deep",
+        "delay": 12000
+    },
+    {
+        "id": 10,
+        "sender": "me",
+        "text": "turns out they do",
+        "delay": 14000
+    }
+]

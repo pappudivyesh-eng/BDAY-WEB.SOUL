@@ -1,0 +1,48 @@
+[
+  {
+    "id": 1,
+    "phase": "The Beginning",
+    "date": "Instagram, sometime",
+    "title": "We met online.",
+    "body": "It started through Instagram — the way so many things do these days. Casual. Unplanned. What began as small conversations about nothing in particular slowly became something I looked forward to.",
+    "accent": "#c9a84c",
+    "icon": "✦"
+  },
+  {
+    "id": 2,
+    "phase": "The Early Days",
+    "date": "Random talks",
+    "title": "Random talks about everything.",
+    "body": "Life, school, interests, memes. The kind of things you share with someone when you're still figuring out who they are — and quietly realizing you want to keep finding out.",
+    "accent": "#f0c4d4",
+    "icon": "◇"
+  },
+  {
+    "id": 3,
+    "phase": "Something Shifted",
+    "date": "Somewhere along the way",
+    "title": "Talking to her became something I genuinely looked forward to.",
+    "body": "Over time, she opened up more — about her studies, football, thoughts, worries. And I found myself paying attention in a way I hadn't expected.",
+    "accent": "#c4b5e8",
+    "icon": "◈"
+  },
+  {
+    "id": 4,
+    "phase": "Everyday",
+    "date": "Every day",
+    "title": "She made ordinary days feel lighter.",
+    "body": "Without even trying. That's a rare thing. Most people don't know they're doing it. I'm not sure she did either.",
+    "accent": "#f0c4d4",
+    "icon": "◇"
+  },
+  {
+    "id": 5,
+    "phase": "The Silence",
+    "date": "Later",
+    "title": "She deactivated Instagram to focus on life.",
+    "body": "And just like that, the conversations stopped. No dramatic ending. No goodbye. Just — quiet. The sudden silence made me realize how much her presence had become part of my routine.",
+    "accent": "rgba(255,255,255,0.2)",
+    "icon": "○",
+    "quiet": true
+  }
+]

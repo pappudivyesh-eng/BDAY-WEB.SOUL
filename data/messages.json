@@ -1,0 +1,38 @@
+[
+    {
+        "id": 1,
+        "title": "The way she talks about things she cares about",
+        "icon": "🌙",
+        "color": "#c9a84c"
+    },
+    {
+        "id": 2,
+        "title": "Her football",
+        "icon": "⚽",
+        "color": "#f0c4d4"
+    },
+    {
+        "id": 3,
+        "title": "How real she was",
+        "icon": "💛",
+        "color": "#c4b5e8"
+    },
+    {
+        "id": 4,
+        "title": "The lightness she brought",
+        "icon": "🕊️",
+        "color": "#f0c4d4"
+    },
+    {
+        "id": 5,
+        "title": "Her quiet strength",
+        "icon": "🌊",
+        "color": "#c9a84c"
+    },
+    {
+        "id": 6,
+        "title": "Just being herself",
+        "icon": "🤍",
+        "color": "rgba(255,255,255,0.3)"
+    }
+]

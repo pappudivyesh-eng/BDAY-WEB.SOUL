@@ -1,0 +1,16 @@
+{
+    "name": "birthday-site",
+    "version": "1.0.0",
+    "description": "Cinematic birthday website for Shruti",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "nodemon server.js"
+    },
+    "dependencies": {
+        "express": "^4.22.2"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.1"
+    }
+}

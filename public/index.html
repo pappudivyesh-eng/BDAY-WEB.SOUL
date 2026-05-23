@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Birthday, Shruti ❤️</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- GSAP from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- ══════════════════════════════════════
+       CINEMATIC INTRO — BLACK SCREEN
+  ══════════════════════════════════════ -->
+    <div id="intro">
+        <canvas id="particleCanvas"></canvas>
+
+        <div class="intro-content">
+            <div id="intro-date" class="intro-text">July 21</div>
+            <div id="intro-line1" class="intro-text intro-small">This isn't just a birthday page.</div>
+            <div id="intro-line2" class="intro-text intro-small">It's about someone who quietly became<br>the best part
+                of my days.</div>
+            <button id="introBtn" class="intro-btn"><span>Begin</span></button>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+       MAIN SITE
+  ══════════════════════════════════════ -->
+    <div id="site" class="site-hidden">
+
+        <div id="stars"></div>
+
+        <!-- Music -->
+        <button id="musicBtn" title="Toggle music">♪</button>
+        <audio id="bgMusic" loop>
+            <!-- <source src="music.mp3" type="audio/mpeg"> -->
+        </audio>
+
+        <!-- ── HERO ── -->
+        <section id="hero">
+            <div class="hero-eyebrow">a story about</div>
+            <div class="hero-name">Shruti</div>
+            <div class="hero-tagline">
+                Some connections don't announce themselves.<br>
+                They just quietly become everything.
+            </div>
+            <div class="hero-date">July 21</div>
+            <div class="scroll-hint">↓ scroll</div>
+        </section>
+
+        <!-- ── CHAPTER: HOW IT STARTED ── -->
+        <div class="chapter-break gsap-fade"><span>how it started</span></div>
+
+        <!-- ── TIMELINE (loaded from JSON) ── -->
+        <section id="timeline-section" class="story-section">
+            <div class="container">
+                <div class="tl-list" id="timelineList">
+                    <!-- Injected by app.js -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ── GALLERY ── -->
+        <div class="chapter-break gsap-fade"><span>moments</span></div>
+
+        <section class="story-section">
+            <div class="container">
+                <div class="center gsap-fade" style="margin-bottom:48px;">
+                    <div class="label">photographs</div>
+                    <div class="big-title"><em class="serif" style="font-style:italic;">Our Polaroids</em></div>
+                </div>
+                <div class="polaroid-grid">
+                    <!-- Replace emoji with <img src="photo.jpg"> inside .polaroid-img -->
+                    <div class="polaroid gsap-polaroid" style="--r:-2.5deg;">
+                        <div class="polaroid-img">📷</div>
+                        <div class="polaroid-caption">your caption here</div>
+                    </div>
+                    <div class="polaroid gsap-polaroid" style="--r:1.8deg;">
+                        <div class="polaroid-img">🌅</div>
+                        <div class="polaroid-caption">your caption here</div>
+                    </div>
+                    <div class="polaroid gsap-polaroid" style="--r:-1.2deg;">
+                        <div class="polaroid-img">🌸</div>
+                        <div class="polaroid-caption">your caption here</div>
+                    </div>
+                    <div class="polaroid gsap-polaroid" style="--r:2.2deg;">
+                        <div class="polaroid-img">✨</div>
+                        <div class="polaroid-caption">your caption here</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── CHAT REVEAL ── -->
+        <div class="chapter-break chapter-break--quiet gsap-fade"><span>a conversation</span></div>
+
+        <section class="story-section section--chat">
+            <div class="container">
+                <div class="center gsap-fade" style="margin-bottom:40px;">
+                    <div class="label">the beginning</div>
+                    <div class="big-title" style="font-size:clamp(24px,4vw,40px);">
+                        <em class="serif" style="font-style:italic;">How it felt,<br>one message at a time.</em>
+                    </div>
+                </div>
+                <div class="chat-window" id="chatWindow">
+                    <!-- Injected by app.js -->
+                </div>
+                <button class="chat-replay-btn" id="chatReplayBtn">↺ replay</button>
+            </div>
+        </section>
+
+        <!-- ── QUIET: INSTAGRAM SILENCE ── -->
+        <div class="chapter-break chapter-break--quiet gsap-fade"><span>and then, silence</span></div>
+
+        <section class="story-section section--quiet">
+            <div class="container">
+                <div class="quiet-block gsap-fade">
+                    <div class="story-eyebrow quiet-eyebrow">she stepped away</div>
+                    <h2 class="story-title quiet-title">She deactivated Instagram<br>to focus on life.</h2>
+                    <p class="story-body quiet-body">
+                        And just like that, the conversations stopped. No dramatic ending. No goodbye. Just — quiet.
+                    </p>
+                </div>
+                <div class="pause-space"></div>
+                <div class="quiet-block gsap-fade">
+                    <p class="story-body quiet-body">
+                        The sudden silence had a weight to it. Not painful exactly. More like the feeling of a familiar
+                        song ending and the room becoming still.
+                    </p>
+                    <p class="story-body quiet-body" style="margin-top:20px;">
+                        It made me realize something I hadn't put into words before — how much her presence had become
+                        part of my routine.
+                    </p>
+                </div>
+                <div class="pause-space"></div>
+                <div class="quiet-block gsap-fade">
+                    <p class="story-body quiet-italic">
+                        Some absences are loud. Hers was quiet. That's what made it stay.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── LETTER ── -->
+        <div class="chapter-break gsap-fade"><span>something I wanted to say</span></div>
+
+        <section class="story-section">
+            <div class="container">
+                <div class="center gsap-fade" style="margin-bottom:48px;">
+                    <div class="label">A Letter</div>
+                    <div class="big-title"><em class="serif" style="font-style:italic;">To Shruti</em></div>
+                </div>
+                <div class="letter-wrap gsap-fade">
+                    <div class="letter-salutation">Shruti,</div>
+                    <div class="letter-body">
+                        <p>I'm not sure you know how much those conversations meant. The small ones. The ones about
+                            nothing in particular. They added up to something I didn't have a word for until later.</p>
+                        <p>You talked about football and studies and the things weighing on you, and I listened — not
+                            because I had to, but because I genuinely wanted to know how things were going for you. That
+                            felt new.</p>
+                        <p>You made ordinary days feel like they had something worth looking forward to. That's not a
+                            small thing. Most people go their whole lives without doing that for someone.</p>
+                        <p>I hope wherever you are right now, things are going the way you want them to. I hope the
+                            football is good. I hope the hard things are getting easier.</p>
+                        <p>And I hope you know that somewhere, someone remembers those conversations and is glad they
+                            happened.</p>
+                    </div>
+                    <div class="letter-sign">— with genuine warmth ♡</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── REASONS (loaded from JSON) ── -->
+        <section class="story-section">
+            <div class="container">
+                <div class="center gsap-fade" style="margin-bottom:48px;">
+                    <div class="label">what stayed</div>
+                    <div class="big-title">
+                        The things about her<br>
+                        <em class="serif" style="font-style:italic;">worth remembering</em>
+                    </div>
+                </div>
+                <div class="reasons-grid" id="reasonsGrid">
+                    <!-- Injected by app.js -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ── EASTER EGG ── -->
+        <section style="padding:20px 24px; position:relative; z-index:1;">
+            <div class="container">
+                <div class="secret-zone" id="secretZone">✦ a quiet thought ✦</div>
+                <div class="secret-msg" id="secretMsg">
+                    <p>"I didn't expect the conversations to matter as much as they did.<br>But I'm glad they happened."
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── FINALE ── -->
+        <section id="finale">
+            <div class="finale-inner">
+                <div class="label gsap-fade" style="margin-bottom:32px; opacity:0.5;">July 21</div>
+                <div class="finale-quote gsap-fade">
+                    Some people enter your life unexpectedly…<br>
+                    <em>and somehow become important before you even realize it.</em>
+                </div>
+                <div class="finale-name gsap-fade">Happy Birthday, Shruti ❤️</div>
+                <button class="btn-finale gsap-fade" id="finalBtn"><span>Happy Birthday ❤️</span></button>
+                <div class="finale-end gsap-fade">Thank you for being part of my story.</div>
+            </div>
+        </section>
+
+    </div><!-- /#site -->
+
+    <script src="app.js"></script>
+    <script src="/cinematic.js"></script>
+</body>
+
+</html>
