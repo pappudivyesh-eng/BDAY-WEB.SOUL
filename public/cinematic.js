@@ -1,374 +1,469 @@
 /**
- * cinematic.js  v2 — LOVE.web
- * Scroll-driven frame sequence + atmospheric layer
- * ─────────────────────────────────────────────────
- * Requires: GSAP + ScrollTrigger already loaded in index.html
- * Frames:   /public/frames/frame0001.jpg … frame0080.jpg
+ * cinematic.js  v3 — LOVE.web
+ * Real-time 3D WebGL environment — Three.js r128
+ * ─────────────────────────────────────────────
+ * Replaces frame-sequence playback with a live-rendered 3D scene.
+ * Camera travels through the environment as the user scrolls.
+ * No pre-rendered frames needed.
+ *
+ * Add ONE line before </body> in index.html:
+ *   <script src="/cinematic.js"></script>
  */
 
 (function () {
-    'use strict';
+  'use strict';
 
-    // ─── CONFIG ──────────────────────────────────────────────
-    const TOTAL_FRAMES = 80;
-    const FRAME_PATH = '/frames/';
-    const FRAME_PREFIX = 'frame';
-    const FRAME_EXT = '.jpg';
-    const SCRUB_SPEED = 0.8;             // faster scrub = snappier feel
-    const CANVAS_ALPHA = 0.92;
-    const PARTICLE_COUNT = 40;
-    const SPACER_VH = 160;            // total intro height in vh (~1.6 screens)
-
-    // ─── HELPERS ─────────────────────────────────────────────
-    const pad4 = n => String(n).padStart(4, '0');
-    const frameURL = i => `${FRAME_PATH}${FRAME_PREFIX}${pad4(i)}${FRAME_EXT}`;
-
-    // ─── INJECT STYLES ───────────────────────────────────────
-    const style = document.createElement('style');
-    style.textContent = `
-    #cv-frame    { position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
-    #cv-fog      { position:fixed; inset:0; width:100%; height:100%; z-index:1; pointer-events:none; opacity:0; transition:opacity 2s ease; }
-    #cv-particles{ position:fixed; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; }
-    #cv-loader   { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center;
-                   justify-content:center; background:#000; z-index:9999; pointer-events:none;
-                   transition:opacity 1s ease; }
-    #cv-loader p { color:rgba(255,200,230,0.7); font-family:sans-serif; font-size:13px; margin-top:14px; letter-spacing:2px; }
-    #cv-loader-bar-wrap { width:180px; height:2px; background:rgba(255,255,255,0.1); border-radius:2px; }
-    #cv-loader-bar      { height:100%; width:0%; background:linear-gradient(90deg,#ff69b4,#bf5fff); border-radius:2px; transition:width 0.1s linear; }
+  // ─── STYLES ──────────────────────────────────────────────
+  const style = document.createElement('style');
+  style.textContent = `
+    #cv-canvas   { position:fixed; inset:0; z-index:0; pointer-events:none; }
+    #cv-2d       { position:fixed; inset:0; z-index:2; pointer-events:none; }
+    #cv-loader   {
+      position:fixed; inset:0; z-index:9999;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      background:#000008; transition:opacity 1.8s ease; pointer-events:none;
+    }
+    #cv-loader-track { width:160px; height:1px; background:rgba(255,255,255,0.08); margin-bottom:18px; }
+    #cv-loader-fill  { height:100%; width:0%; background:linear-gradient(90deg,#334,#88f); transition:width 0.3s; }
+    #cv-loader span  { color:rgba(180,170,210,0.45); font:11px/1 sans-serif; letter-spacing:4px; text-transform:uppercase; }
   `;
-    document.head.appendChild(style);
+  document.head.appendChild(style);
 
-    // ─── LOADING SCREEN ──────────────────────────────────────
-    const loader = document.createElement('div');
-    loader.id = 'cv-loader';
-    loader.innerHTML = `
-    <div id="cv-loader-bar-wrap"><div id="cv-loader-bar"></div></div>
-    <p>LOADING MEMORIES…</p>
-  `;
-    document.body.appendChild(loader);
-    const loaderBar = document.getElementById('cv-loader-bar');
+  // ─── LOADER UI ───────────────────────────────────────────
+  const loader = document.createElement('div');
+  loader.id = 'cv-loader';
+  loader.innerHTML = `
+    <div id="cv-loader-track"><div id="cv-loader-fill"></div></div>
+    <span>Rendering scene…</span>`;
+  document.body.appendChild(loader);
+  const fill = document.getElementById('cv-loader-fill');
 
-    // ─── CANVAS — FRAME LAYER ────────────────────────────────
-    const frameCanvas = document.createElement('canvas');
-    frameCanvas.id = 'cv-frame';
-    document.body.prepend(frameCanvas);
-    const fCtx = frameCanvas.getContext('2d');
+  // ─── 2D OVERLAY CANVAS (particles) ───────────────────────
+  const cv2d = document.createElement('canvas');
+  cv2d.id = 'cv-2d';
+  document.body.appendChild(cv2d);
+  const c2 = cv2d.getContext('2d');
+  let W2 = cv2d.width  = window.innerWidth;
+  let H2 = cv2d.height = window.innerHeight;
 
-    // ─── CANVAS — FOG LAYER ──────────────────────────────────
-    const fogCanvas = document.createElement('canvas');
-    fogCanvas.id = 'cv-fog';
-    document.body.insertBefore(fogCanvas, frameCanvas.nextSibling);
-    const fogCtx = fogCanvas.getContext('2d');
+  // ─── LIFT EXISTING CONTENT ───────────────────────────────
+  document.querySelectorAll('body > *:not(#cv-canvas):not(#cv-2d):not(#cv-loader)').forEach(el => {
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    if (Number(el.style.zIndex || 0) < 3) el.style.zIndex = '3';
+  });
 
-    // ─── CANVAS — PARTICLE LAYER ─────────────────────────────
-    const partCanvas = document.createElement('canvas');
-    partCanvas.id = 'cv-particles';
-    document.body.appendChild(partCanvas);
-    const pCtx = partCanvas.getContext('2d');
+  // ─── LOAD THREE.JS THEN BOOT ─────────────────────────────
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  s.onload = boot;
+  document.head.appendChild(s);
 
-    // Lift all original body content above our layers
-    document.querySelectorAll('body > *:not(#cv-frame):not(#cv-fog):not(#cv-particles):not(#cv-loader)').forEach(el => {
-        if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
-        if (Number(el.style.zIndex || 0) < 3) el.style.zIndex = '3';
+  // ═══════════════════════════════════════════════════════════
+  function boot() {
+    const T = window.THREE;
+
+    // Body must be deep dark — not transparent (avoids white flash)
+    document.body.style.background = '#000008';
+    document.body.style.backgroundColor = '#000008';
+    document.documentElement.style.background = '#000008';
+
+    // Make site wrapper + all sections transparent so canvas shows through
+    const transparentTargets = [
+      '#site', '#intro', '#wrapper', '#main', '#app',
+      '.site-hidden', 'section', '.section', '.chapter',
+      '.story-section', '.hero', '.timeline', '.gallery',
+      '.letter-section', '.finale', '.quiet-section'
+    ];
+    transparentTargets.forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => {
+        el.style.backgroundColor = 'transparent';
+        el.style.background = 'transparent';
+      });
     });
 
-    // ─── RESIZE ──────────────────────────────────────────────
-    let W, H;
-    function resize() {
-        W = window.innerWidth;
-        H = window.innerHeight;
-        [frameCanvas, fogCanvas, partCanvas].forEach(c => {
-            c.width = W;
-            c.height = H;
-        });
-        if (lastFrameImg) drawFrame(lastFrameImg);
-    }
-    window.addEventListener('resize', resize);
-
-    // ─── FRAME RENDERING ─────────────────────────────────────
-    let lastFrameImg = null;
-
-    function drawFrame(img) {
-        if (!img || !img.complete || !img.naturalWidth) return;
-        fCtx.clearRect(0, 0, W, H);
-
-        // Cover-fit the frame
-        const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
-        const dx = (W - img.naturalWidth * scale) / 2;
-        const dy = (H - img.naturalHeight * scale) / 2;
-        fCtx.globalAlpha = CANVAS_ALPHA;
-        fCtx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
-        fCtx.globalAlpha = 1;
-
-        // Dark vignette overlay
-        const vig = fCtx.createRadialGradient(W / 2, H / 2, H * 0.2, W / 2, H / 2, H * 0.9);
-        vig.addColorStop(0, 'rgba(0,0,0,0)');
-        vig.addColorStop(1, 'rgba(0,0,0,0.72)');
-        fCtx.fillStyle = vig;
-        fCtx.fillRect(0, 0, W, H);
-    }
-
-    // ─── FRAME PRELOADING ────────────────────────────────────
-    const frames = new Array(TOTAL_FRAMES).fill(null);
-    let loaded = 0;
-
-    function preloadFrames(onReady) {
-        let firstFrameReady = false;
-
-        for (let i = 0; i < TOTAL_FRAMES; i++) {
-            const img = new Image();
-            const idx = i;
-
-            img.onload = () => {
-                frames[idx] = img;
-                loaded++;
-
-                // Show first frame immediately
-                if (idx === 0 && !firstFrameReady) {
-                    firstFrameReady = true;
-                    lastFrameImg = img;
-                    resize();          // sets W/H and draws frame 0
-                    drawFrame(img);
-                }
-
-                // Progress bar
-                const pct = (loaded / TOTAL_FRAMES) * 100;
-                loaderBar.style.width = pct + '%';
-
-                // All loaded
-                if (loaded === TOTAL_FRAMES) {
-                    setTimeout(() => {
-                        loader.style.opacity = '0';
-                        setTimeout(() => loader.remove(), 1000);
-                        onReady();
-                    }, 400);
-                }
-            };
-
-            img.onerror = () => {
-                console.warn(`[cinematic] Failed to load: ${frameURL(i + 1)}`);
-                loaded++;
-                loaderBar.style.width = (loaded / TOTAL_FRAMES * 100) + '%';
-                if (loaded === TOTAL_FRAMES) onReady();
-            };
-
-            img.src = frameURL(i + 1);   // frame0001 … frame0080
-        }
-    }
-
-    // ─── SCROLL-DRIVEN SEQUENCE ──────────────────────────────
-    let currentIdx = 0;
-
-    function initScrollSequence() {
-        gsap.registerPlugin(ScrollTrigger);
-
-        // Compact spacer — only SPACER_VH tall, sits above site content
-        const spacer = document.createElement('div');
-        spacer.id = 'cv-spacer';
-        spacer.style.cssText = `
-      height: ${SPACER_VH}vh;
-      pointer-events: none;
-      position: relative;
-      z-index: 0;
-      flex-shrink: 0;
+    // Inject global override for any background set via stylesheet
+    const bgOverride = document.createElement('style');
+    bgOverride.textContent = `
+      html, body { background: #000008 !important; }
+      #site, section, .section, .chapter, .story-section,
+      .hero, .timeline, .gallery, .letter-section,
+      .finale, .quiet-section, .intro-section, #intro {
+        background: transparent !important;
+        background-color: transparent !important;
+      }
     `;
-        const site = document.getElementById('site') || document.querySelector('[class*="site"]') || document.body.firstElementChild;
-        if (site) document.body.insertBefore(spacer, site);
+    document.head.appendChild(bgOverride);
 
-        const proxy = { frame: 0 };
+    // Wait for full layout before reading dimensions
+    let W = document.documentElement.clientWidth;
+    let H = document.documentElement.clientHeight;
 
-        // ── Frame sequence scrub ──────────────────────────────
-        gsap.to(proxy, {
-            frame: TOTAL_FRAMES - 1,
-            ease: 'none',
-            scrollTrigger: {
-                trigger: spacer,
-                start: 'top top',
-                end: 'bottom top',
-                scrub: SCRUB_SPEED,
-                pin: true,
-                anticipatePin: 1,
-                onUpdate(self) {
-                    const i = Math.min(TOTAL_FRAMES - 1, Math.round(self.progress * (TOTAL_FRAMES - 1)));
-                    if (i !== currentIdx && frames[i]) {
-                        currentIdx = i;
-                        lastFrameImg = frames[i];
-                        drawFrame(frames[i]);
-                    }
+    // ── RENDERER ───────────────────────────────────────────
+    const renderer = new T.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    renderer.setSize(W, H);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x00000f, 1);
+    renderer.toneMapping = T.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 2.2;
+    Object.assign(renderer.domElement.style, {
+      position: 'fixed', inset: '0', zIndex: '0', pointerEvents: 'none'
+    });
+    renderer.domElement.id = 'cv-canvas';
+    document.body.prepend(renderer.domElement);
 
-                    // Start fading canvas out at 70% through the sequence
-                    // so content bleeds in while animation still plays
-                    if (self.progress > 0.7) {
-                        const fadeOut = (self.progress - 0.7) / 0.3; // 0→1 over last 30%
-                        frameCanvas.style.opacity = Math.max(0.15, CANVAS_ALPHA - fadeOut * (CANVAS_ALPHA - 0.15));
-                        fogCanvas.style.opacity = Math.max(0, 1 - fadeOut * 0.8);
-                    } else {
-                        frameCanvas.style.opacity = CANVAS_ALPHA;
-                    }
-                },
-                onLeave() {
-                    // Canvas becomes a soft dark background layer behind content
-                    gsap.to(frameCanvas, { opacity: 0.12, duration: 1.2, ease: 'power2.out' });
-                    gsap.to(fogCanvas, { opacity: 0, duration: 1.0 });
-                },
-                onEnterBack() {
-                    gsap.to(frameCanvas, { opacity: CANVAS_ALPHA, duration: 0.6 });
-                    gsap.to(fogCanvas, { opacity: 1, duration: 0.8 });
-                }
-            }
+    // ── SCENE ──────────────────────────────────────────────
+    const scene = new T.Scene();
+    scene.fog = new T.FogExp2(0x02000f, 0.004);
+
+    // ── CAMERA ─────────────────────────────────────────────
+    const cam = new T.PerspectiveCamera(55, W / H, 0.1, 3000);
+    cam.position.set(0, 2.5, 55);
+
+    // Smooth camera state — scroll drives TARGET, RAF lerps ACTUAL
+    const tgt = { x:0, y:2.5, z:55, lx:0, ly:-0.5 };
+    const cur = { x:0, y:2.5, z:55, lx:0, ly:-0.5 };
+
+    // ── LIGHTS ─────────────────────────────────────────────
+    scene.add(new T.AmbientLight(0x334466, 1.5));
+
+    const moonLight = new T.DirectionalLight(0xaabbff, 4.0);
+    moonLight.position.set(-30, 80, -20);
+    scene.add(moonLight);
+
+    const rimLight = new T.DirectionalLight(0x6644aa, 1.2);
+    rimLight.position.set(40, 10, 60);
+    scene.add(rimLight);
+
+    const horizonLight = new T.PointLight(0x5533aa, 40, 800);
+    horizonLight.position.set(0, -4, -300);
+    scene.add(horizonLight);
+
+    // Fill light so scene is never pure black
+    const fillLight = new T.PointLight(0x112244, 20, 500);
+    fillLight.position.set(0, 30, 50);
+    scene.add(fillLight);
+
+    // ── BACKGROUND SPHERE (sky/nebula) ─────────────────────
+    const skyGeo = new T.SphereGeometry(1400, 32, 32);
+    const skyMat = new T.MeshBasicMaterial({ color: 0x080615, side: T.BackSide });
+    scene.add(new T.Mesh(skyGeo, skyMat));
+
+    // ── STARFIELD ──────────────────────────────────────────
+    const STAR_N = 7000;
+    const sPos = new Float32Array(STAR_N * 3);
+    const sBri = new Float32Array(STAR_N);
+    for (let i = 0; i < STAR_N; i++) {
+      const th = Math.random() * Math.PI * 2;
+      const ph = Math.acos(2 * Math.random() - 1);
+      const r  = 900 + Math.random() * 300;
+      sPos[i*3]   = r * Math.sin(ph) * Math.cos(th);
+      sPos[i*3+1] = r * Math.sin(ph) * Math.sin(th);
+      sPos[i*3+2] = r * Math.cos(ph);
+      sBri[i] = Math.random();
+    }
+    const starGeo = new T.BufferGeometry();
+    starGeo.setAttribute('position', new T.BufferAttribute(sPos, 3));
+    const starMat = new T.PointsMaterial({
+      color: 0xffffff, size: 2.5, sizeAttenuation: true,
+      transparent: true, opacity: 1.0
+    });
+    scene.add(new T.Points(starGeo, starMat));
+
+    // ── WATER PLANE ────────────────────────────────────────
+    const wGeo = new T.PlaneGeometry(1000, 800, 200, 120);
+    // Subtle initial wave displacement
+    const wPA = wGeo.attributes.position.array;
+    for (let i = 0; i < wPA.length; i += 3) {
+      wPA[i+2] = (Math.random() - 0.5) * 0.15;
+    }
+    const wMat = new T.MeshStandardMaterial({
+      color: 0x010510, metalness: 0.98, roughness: 0.04,
+    });
+    const water = new T.Mesh(wGeo, wMat);
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = -2.5;
+    scene.add(water);
+
+    // Moonlight reflection strip on water
+    const refGeo = new T.PlaneGeometry(3, 120);
+    const refMat = new T.MeshBasicMaterial({
+      color: 0x3355aa, transparent: true, opacity: 0.3,
+      blending: T.AdditiveBlending, depthWrite: false
+    });
+    const refMesh = new T.Mesh(refGeo, refMat);
+    refMesh.rotation.x = -Math.PI / 2;
+    refMesh.position.set(0, -2.4, 10);
+    scene.add(refMesh);
+
+    // ── HORIZON GLOW PLANE ─────────────────────────────────
+    const hGeo = new T.PlaneGeometry(800, 40);
+    const hMat = new T.MeshBasicMaterial({
+      color: 0x9944ff, transparent: true, opacity: 0.9,
+      blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide
+    });
+    const hMesh = new T.Mesh(hGeo, hMat);
+    hMesh.position.set(0, 2, -200);
+    scene.add(hMesh);
+
+    // Second glow layer — warm amber
+    const hGeo2 = new T.PlaneGeometry(600, 25);
+    const hMat2 = new T.MeshBasicMaterial({
+      color: 0xff6600, transparent: true, opacity: 0.25,
+      blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide
+    });
+    const hMesh2 = new T.Mesh(hGeo2, hMat2);
+    hMesh2.position.set(0, -1, -210);
+    scene.add(hMesh2);
+
+    // ── VOLUMETRIC FOG PLANES (depth layers) ───────────────
+    const fogLayers = [];
+    const fogColors = [0x0a0520, 0x080318, 0x06021a, 0x050215, 0x040112, 0x030110];
+    for (let i = 0; i < 12; i++) {
+      const fg = new T.PlaneGeometry(280 + i*20, 40 + i*5);
+      const fm = new T.MeshBasicMaterial({
+        color: fogColors[i % fogColors.length],
+        transparent: true,
+        opacity: 0.06 + Math.random() * 0.07,
+        blending: T.AdditiveBlending,
+        side: T.DoubleSide, depthWrite: false
+      });
+      const fp = new T.Mesh(fg, fm);
+      fp.position.set(
+        (Math.random() - 0.5) * 80,
+        -1 + Math.random() * 10,
+        -15 - i * 35
+      );
+      fp.rotation.y = (Math.random() - 0.5) * 0.4;
+      scene.add(fp);
+      fogLayers.push({ m: fp, spd: 0.002 + Math.random() * 0.003, ph: Math.random() * Math.PI * 2 });
+    }
+
+    // ── 3D DEPTH PARTICLES ─────────────────────────────────
+    const PN = 300;
+    const pGeo = new T.BufferGeometry();
+    const pPos = new Float32Array(PN * 3);
+    const pV   = [];
+    for (let i = 0; i < PN; i++) {
+      pPos[i*3]   = (Math.random() - 0.5) * 200;
+      pPos[i*3+1] = Math.random() * 40 - 2;
+      pPos[i*3+2] = (Math.random() - 0.5) * 200;
+      pV.push({ dy: 0.008 + Math.random() * 0.015, dx: (Math.random()-0.5)*0.003 });
+    }
+    pGeo.setAttribute('position', new T.BufferAttribute(pPos, 3));
+    const pMat = new T.PointsMaterial({
+      color: 0x8866bb, size: 0.18, sizeAttenuation: true,
+      transparent: true, opacity: 0.45, blending: T.AdditiveBlending
+    });
+    const pSys = new T.Points(pGeo, pMat);
+    scene.add(pSys);
+
+    // ── SCROLL CAMERA PATH ─────────────────────────────────
+    // Each keyframe: camera pos + lookAt target
+    const path = [
+      { z:55,  y:2.5,  lz:-10, ly:-0.5 },   // 0%  — water level, intimate
+      { z:20,  y:7,    lz:-40, ly:1    },   // 30% — rising, pushing forward
+      { z:-15, y:18,   lz:-80, ly:6    },   // 60% — above fog layer
+      { z:-60, y:38,   lz:-150,ly:14   },   // 100%— high, god-view, cinematic
+    ];
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function smoothstep(t) { return t*t*(3-2*t); }
+
+    function setCameraTarget(p) {
+      const segs  = path.length - 1;
+      const si    = Math.min(segs - 1, Math.floor(p * segs));
+      const t     = smoothstep((p * segs) - si);
+      const a = path[si], b = path[si + 1];
+      tgt.z  = lerp(a.z,  b.z,  t);
+      tgt.y  = lerp(a.y,  b.y,  t);
+      tgt.lz = lerp(a.lz, b.lz, t);
+      tgt.ly = lerp(a.ly, b.ly, t);
+    }
+
+    // ── GSAP SCROLL TRIGGER ────────────────────────────────
+    function waitGSAP(cb, n=0) {
+      if (window.gsap && window.ScrollTrigger) return cb();
+      if (n > 80) return;
+      setTimeout(() => waitGSAP(cb, n+1), 100);
+    }
+
+    waitGSAP(() => {
+      gsap.registerPlugin(ScrollTrigger);
+
+      const spacer = document.createElement('div');
+      spacer.id = 'cv-spacer';
+      spacer.style.cssText = 'height:180vh;pointer-events:none;position:relative;z-index:0;';
+      const site = document.getElementById('site') || document.body.firstElementChild;
+      if (site && site !== renderer.domElement && site !== cv2d && site !== loader) {
+        document.body.insertBefore(spacer, site);
+      }
+
+      ScrollTrigger.create({
+        trigger: spacer,
+        start:   'top top',
+        end:     'bottom top',
+        pin:     true,
+        scrub:   1.2,
+        anticipatePin: 1,
+        onUpdate(self) {
+          setCameraTarget(self.progress);
+          // Canvas fade into content
+          if (self.progress > 0.72) {
+            const f = (self.progress - 0.72) / 0.28;
+            renderer.domElement.style.opacity = Math.max(0.12, 1 - f * 0.88).toFixed(3);
+          } else {
+            renderer.domElement.style.opacity = '1';
+          }
+        },
+        onLeave()      { gsap.to(renderer.domElement, { opacity: 0.1, duration: 1.2 }); },
+        onEnterBack()  { gsap.to(renderer.domElement, { opacity: 1,   duration: 0.7 }); }
+      });
+
+      // Content bleeds in at 68% through intro
+      const siteEl = document.getElementById('site');
+      if (siteEl) {
+        gsap.set(siteEl, { autoAlpha: 0, y: 50 });
+        ScrollTrigger.create({
+          trigger: spacer,
+          start:   '68% top',
+          onEnter:     () => gsap.to(siteEl, { autoAlpha:1, y:0, duration:1.6, ease:'power3.out' }),
+          onLeaveBack: () => gsap.to(siteEl, { autoAlpha:0, y:50, duration:0.8 })
         });
-
-        // ── Content bleeds in early — at 60% scroll through intro ──
-        const site2 = document.getElementById('site') || document.querySelector('[class*="site"]');
-        if (site2) {
-            gsap.fromTo(site2,
-                { autoAlpha: 0, y: 40 },
-                {
-                    autoAlpha: 1, y: 0,
-                    duration: 1.6,
-                    ease: 'power2.out',
-                    scrollTrigger: {
-                        trigger: spacer,
-                        start: '60% top',       // content starts appearing at 60% of intro
-                        end: 'bottom top',
-                        scrub: false,
-                        toggleActions: 'play none none reverse'
-                    }
-                }
-            );
-            // Initially hide site content until bleed-in point
-            site2.style.opacity = '0';
-        }
-    }
-
-    // ─── AMBIENT FOG ─────────────────────────────────────────
-    let fogT = 0;
-    function fogLoop() {
-        fogCtx.clearRect(0, 0, W, H);
-        fogT += 0.003;
-        for (let i = 0; i < 4; i++) {
-            const cx = W * (0.15 + 0.7 * Math.sin(fogT + i * 1.4));
-            const cy = H * (0.2 + 0.6 * Math.cos(fogT * 0.6 + i));
-            const r = W * (0.3 + 0.1 * Math.sin(fogT * 0.4 + i));
-            const g = fogCtx.createRadialGradient(cx, cy, 0, cx, cy, r);
-            const hue = 300 + i * 20;
-            g.addColorStop(0, `hsla(${hue},75%,55%,0.05)`);
-            g.addColorStop(1, `hsla(${hue},75%,45%,0)`);
-            fogCtx.fillStyle = g;
-            fogCtx.fillRect(0, 0, W, H);
-        }
-        requestAnimationFrame(fogLoop);
-    }
-    setTimeout(() => { fogCanvas.style.opacity = '1'; }, 2500);
-
-    // ─── PARTICLES (ANTIGRAVITY) ─────────────────────────────
-    class Particle {
-        constructor(scatter) { this.init(scatter); }
-        init(scatter) {
-            this.x = Math.random() * (W || 800);
-            this.y = scatter ? Math.random() * (H || 600) : (H || 600) + 10;
-            this.r = Math.random() * 2.2 + 0.6;
-            this.vy = -(Math.random() * 0.6 + 0.2);
-            this.vx = (Math.random() - 0.5) * 0.35;
-            this.alpha = Math.random() * 0.5 + 0.1;
-            this.fade = Math.random() * 0.0006 + 0.0002;
-            this.heart = Math.random() < 0.15;
-            this.hue = Math.random() < 0.55 ? 330 : 275;
-            this.sway = Math.random() * Math.PI * 2;
-        }
-        tick() {
-            this.sway += 0.013;
-            this.x += this.vx + Math.sin(this.sway) * 0.25;
-            this.y += this.vy;
-            this.alpha -= this.fade;
-            if (this.y < -15 || this.alpha <= 0) this.init(false);
-        }
-        draw() {
-            pCtx.save();
-            pCtx.globalAlpha = Math.max(0, this.alpha);
-            if (this.heart) {
-                pCtx.translate(this.x, this.y);
-                pCtx.fillStyle = `hsl(${this.hue},100%,72%)`;
-                pCtx.shadowColor = `hsl(${this.hue},100%,72%)`;
-                pCtx.shadowBlur = 8;
-                const s = this.r * 2;
-                pCtx.beginPath();
-                pCtx.moveTo(0, 0);
-                pCtx.bezierCurveTo(-s, -s, -s * 2, s * 0.6, 0, s * 2.2);
-                pCtx.bezierCurveTo(s * 2, s * 0.6, s, -s, 0, 0);
-                pCtx.fill();
-            } else {
-                const g = pCtx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r * 3);
-                g.addColorStop(0, `hsl(${this.hue},100%,85%)`);
-                g.addColorStop(1, `hsla(${this.hue},100%,60%,0)`);
-                pCtx.fillStyle = g;
-                pCtx.beginPath();
-                pCtx.arc(this.x, this.y, this.r * 3, 0, Math.PI * 2);
-                pCtx.fill();
-            }
-            pCtx.restore();
-        }
-    }
-
-    const particles = [];
-    function particleLoop() {
-        pCtx.clearRect(0, 0, W, H);
-        particles.forEach(p => { p.tick(); p.draw(); });
-        requestAnimationFrame(particleLoop);
-    }
-
-    // Click spawns hearts
-    document.addEventListener('click', e => {
-        for (let i = 0; i < 7; i++) {
-            const p = new Particle(true);
-            p.x = e.clientX + (Math.random() - 0.5) * 28;
-            p.y = e.clientY;
-            p.vy = -(Math.random() * 1.8 + 0.8);
-            p.heart = true;
-            p.alpha = 0.85;
-            p.fade = 0.006;
-            particles.push(p);
-        }
+      }
     });
 
-    // ─── SECTION BLUR-IN TRANSITIONS ─────────────────────────
-    function initSections() {
-        document.querySelectorAll('section, .chapter, .timeline-item, .polaroid, .reason-card').forEach(el => {
-            if (el.dataset.cin) return;
-            el.dataset.cin = '1';
-            gsap.fromTo(el,
-                { autoAlpha: 0, filter: 'blur(10px)', y: 30 },
-                {
-                    autoAlpha: 1, filter: 'blur(0px)', y: 0,
-                    duration: 1.2, ease: 'power2.out',
-                    scrollTrigger: { trigger: el, start: 'top 85%', toggleActions: 'play none none reverse' }
-                }
-            );
-        });
-    }
-
-    // ─── BOOT SEQUENCE ───────────────────────────────────────
-    resize(); // size canvases before loading
-
-    preloadFrames(() => {
-        // All frames ready — start everything
-        for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(new Particle(true));
-
-        fogLoop();
-        particleLoop();
-
-        // Wait for GSAP (already loaded in <head> but just in case)
-        function boot(attempts) {
-            if (window.gsap && window.ScrollTrigger) {
-                initScrollSequence();
-                initSections();
-            } else if (attempts < 50) {
-                setTimeout(() => boot(attempts + 1), 100);
-            } else {
-                console.error('[cinematic] GSAP not available.');
-            }
-        }
-        boot(0);
+    // ── MOUSE MICRO-PARALLAX ──────────────────────────────
+    let mx = 0, my = 0;
+    document.addEventListener('mousemove', e => {
+      mx = (e.clientX / W - 0.5);
+      my = (e.clientY / H - 0.5);
     });
+
+    // ── 2D PARTICLE OVERLAY (canvas fallback layer) ────────
+    class P2 {
+      constructor(scatter) { this.r(scatter); }
+      r(scatter) {
+        this.x  = Math.random() * W2;
+        this.y  = scatter ? Math.random() * H2 : H2 + 5;
+        this.sz = Math.random() * 1.4 + 0.4;
+        this.vy = -(Math.random() * 0.5 + 0.15);
+        this.vx = (Math.random() - 0.5) * 0.2;
+        this.a  = Math.random() * 0.35 + 0.08;
+        this.da = Math.random() * 0.0004 + 0.0001;
+        this.sw = Math.random() * Math.PI * 2;
+      }
+      tick() {
+        this.sw += 0.01;
+        this.x  += this.vx + Math.sin(this.sw) * 0.18;
+        this.y  += this.vy;
+        this.a  -= this.da;
+        if (this.y < -5 || this.a <= 0) this.r(false);
+      }
+      draw() {
+        c2.save();
+        c2.globalAlpha = Math.max(0, this.a);
+        const g = c2.createRadialGradient(this.x,this.y,0,this.x,this.y,this.sz*3);
+        g.addColorStop(0,'hsl(270,60%,80%)');
+        g.addColorStop(1,'hsla(270,60%,60%,0)');
+        c2.fillStyle = g;
+        c2.beginPath();
+        c2.arc(this.x, this.y, this.sz*3, 0, Math.PI*2);
+        c2.fill();
+        c2.restore();
+      }
+    }
+    const p2s = Array.from({length:45}, () => new P2(true));
+
+    function p2loop() {
+      c2.clearRect(0,0,W2,H2);
+      p2s.forEach(p => { p.tick(); p.draw(); });
+      requestAnimationFrame(p2loop);
+    }
+    p2loop();
+
+    // ── CLOCK ─────────────────────────────────────────────
+    const clock = new T.Clock();
+
+    // ── RENDER LOOP ───────────────────────────────────────
+    function animate() {
+      requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+      const lf = 0.032; // camera lerp factor — cinematic lag
+
+      // Lerp camera toward scroll target
+      cur.z  += (tgt.z  - cur.z)  * lf;
+      cur.y  += (tgt.y  - cur.y)  * lf;
+      cur.lz  = tgt.lz !== undefined ? cur.lz + (tgt.lz - cur.lz) * lf : cur.lz;
+      cur.ly += (tgt.ly - cur.ly) * lf;
+
+      // Apply mouse micro-parallax on top
+      cam.position.set(cur.x + mx * 2.5, cur.y + my * -1.2, cur.z);
+      cam.lookAt(mx * 2, cur.ly, cur.lz !== undefined ? cur.lz : -30);
+
+      // Fog plane drift
+      fogLayers.forEach(({ m, spd, ph }) => {
+        m.position.x += Math.sin(t * spd + ph) * 0.05;
+        m.material.opacity = 0.05 + Math.sin(t * spd * 0.4 + ph) * 0.025;
+      });
+
+      // Water surface shimmer
+      refMesh.material.opacity = 0.22 + Math.sin(t * 0.5) * 0.10;
+      const wA = wGeo.attributes.position.array;
+      for (let i = 0; i < wA.length; i += 3) {
+        wA[i+2] = Math.sin(t*0.25 + i*0.04) * 0.07 + Math.cos(t*0.15 + i*0.07) * 0.04;
+      }
+      wGeo.attributes.position.needsUpdate = true;
+      wGeo.computeVertexNormals();
+
+      // 3D particle float
+      const pA = pGeo.attributes.position.array;
+      for (let i = 0; i < PN; i++) {
+        pA[i*3+1] += pV[i].dy * 0.4;
+        pA[i*3]   += pV[i].dx;
+        if (pA[i*3+1] > 40) {
+          pA[i*3+1] = -2;
+          pA[i*3]   = (Math.random()-0.5)*200;
+        }
+      }
+      pGeo.attributes.position.needsUpdate = true;
+
+      // Star slow rotation (camera drift illusion)
+      starMat.opacity = 0.75 + Math.sin(t*0.12)*0.06;
+
+      // Horizon pulse
+      horizonLight.intensity = 10 + Math.sin(t * 0.18) * 3;
+
+      renderer.render(scene, cam);
+    }
+    animate();
+
+    // ── RESIZE ────────────────────────────────────────────
+    window.addEventListener('resize', () => {
+      W = document.documentElement.clientWidth;
+      H = document.documentElement.clientHeight;
+      W2 = cv2d.width  = W;
+      H2 = cv2d.height = H;
+      cam.aspect = W / H;
+      cam.updateProjectionMatrix();
+      renderer.setSize(W, H);
+    });
+    // Force correct size immediately after DOM settles
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+
+    // ── DISMISS LOADER ────────────────────────────────────
+    let prog = 0;
+    const pi = setInterval(() => {
+      prog = Math.min(100, prog + 4);
+      fill.style.width = prog + '%';
+      if (prog >= 100) {
+        clearInterval(pi);
+        setTimeout(() => {
+          loader.style.opacity = '0';
+          setTimeout(() => loader.remove(), 1800);
+        }, 300);
+      }
+    }, 40);
+
+  } // end boot()
 
 })();
