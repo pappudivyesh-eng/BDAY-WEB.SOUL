@@ -36,13 +36,14 @@
     "icon": "◇"
   },
   {
+    
     "id": 5,
-    "phase": "The Silence",
-    "date": "Later",
-    "title": "She deactivated Instagram to focus on life.",
-    "body": "And just like that, the conversations stopped. No dramatic ending. No goodbye. Just — quiet. The sudden silence made me realize how much her presence had become part of my routine.",
-    "accent": "rgba(255,255,255,0.2)",
-    "icon": "○",
-    "quiet": true
+    "phase": "The Question",
+    "date": "Still wondering",
+    "title": "I don't really know what to call our connection.",
+    "body": "Maybe that's okay. Some people enter your life quietly and somehow become part of your routine before you even notice. You were one of those people. And for that, I'm grateful.",
+    "accent": "#c4b5e8",
+    "icon": "◈"
   }
+  
 ]
